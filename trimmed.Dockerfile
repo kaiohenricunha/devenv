@@ -1,4 +1,4 @@
-# Setting up a simpler container for SRE/DevOps work
+# Setting up a simpler trimmed container for SRE/DevOps work
 # -----------------------------------------
 
 # k6 Stage
@@ -43,6 +43,9 @@ RUN curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2
 # Clean up
 RUN apt-get clean && \
     rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
+
+# Copy files from the current directory to /home/sre in the container
+COPY . /home/sre
 
 # Set environment PATH for all users
 ENV PATH="/opt/tfenv/bin:/opt/tgenv/bin:/usr/local/bin/kubectx:/usr/local/bin/kubens:/usr/local/bin:${PATH}"
