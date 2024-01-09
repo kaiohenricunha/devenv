@@ -14,6 +14,9 @@ COPY --from=k6-stage /usr/bin/k6 /usr/bin/k6
 # Update and install necessary basic packages
 RUN apt-get update && apt-get install -y curl git wget bash-completion software-properties-common groff unzip
 
+# Set up a non-root user and set working directory
+RUN useradd -m sre
+
 # Kubernetes: kubectl, kubectx, kubens, Helm
 RUN curl -LO "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl" && \
     chmod +x ./kubectl && \
@@ -26,8 +29,10 @@ RUN curl -LO "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/s
     ./get_helm.sh
 
 # Terraform and Terragrunt
-RUN for i in 1 2 3; do git clone --depth=1 https://github.com/tfutils/tfenv.git /opt/tfenv && break || sleep 15; done && \
-    for i in 1 2 3; do git clone --depth=1 https://github.com/tgenv/tgenv.git /opt/tgenv && break || sleep 15; done
+RUN git clone --depth=1 https://github.com/tfutils/tfenv.git /opt/tfenv && \
+    git clone --depth=1 https://github.com/tgenv/tgenv.git /opt/tgenv && \
+    chown -R sre:sre /opt/tfenv && \
+    chown -R sre:sre /opt/tgenv
 
 # AWS CLI
 RUN curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip" && \
@@ -41,9 +46,6 @@ RUN apt-get clean && \
 
 # Set environment PATH for all users
 ENV PATH="/opt/tfenv/bin:/opt/tgenv/bin:/usr/local/bin/kubectx:/usr/local/bin/kubens:/usr/local/bin:${PATH}"
-
-# Set up a non-root user and set working directory
-RUN useradd -m sre
 
 USER sre
 WORKDIR /home/sre
