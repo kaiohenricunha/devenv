@@ -28,7 +28,7 @@ This script installs necessary system packages and sets up various tools and con
 ## Included Tools
 
 - Programming Languages: Python, Go, Node.js, Rust, Java, Maven
-- Infrastructure-as-Code (IaC) Tools: Pulumi, Terraform, Terragrunt, Ansible and Crossplane
+- Infrastructure-as-Code (IaC) Tools: Pulumi, Terraform, Terragrunt, Ansible, OpenTofu and Crossplane
 - Cloud Tools: AWS CLI, Google Cloud SDK, Azure CLI, eksctl
 - Kubernetes Tools: kubectl, kubectx, kubens, Helm, Kubeshark
 - Other Tools: K6, Docker Compose, Minikube, Kind, Flux CLI, istioctl, version managers for all programming languages.
