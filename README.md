@@ -1,73 +1,53 @@
-# Docker SRE and DevOps Container Environments
+# Linux Environment Setup for DevOps and SRE
 
 ## Overview
-This repository contains Dockerfiles for creating containerized environments tailored for Site Reliability Engineering (SRE) and DevOps tasks. There are two configurations available:
-
-1. **Trimmed Environment:** This configuration includes a set of commonly used tools, making it lightweight and quick to deploy. It's ideal for everyday tasks and for users who require a basic set of tools.
-
-2. **Complete Environment:** This setup includes a more comprehensive suite of tools, covering a wide range of SRE and DevOps needs. It's designed for in-depth tasks and advanced users who need an extensive array of utilities.
-
-Both environments are built on top of an Ubuntu base image and include tools for managing and deploying infrastructure, such as Kubernetes (kubectl, kubectx, kubens), Terraform (via tfenv), Terragrunt (via tgenv), AWS CLI, and Helm.
+This repository contains scripts to set up a Linux environment tailored for DevOps and Site Reliability Engineering (SRE) tasks. It automates the installation of programming languages, infrastructure-as-code (IaC) tools, cloud tools, Kubernetes tools, and other utilities commonly used in DevOps workflows.
 
 ## Prerequisites
-- Docker installed on your machine.
-- Basic knowledge of Docker commands.
+- A Linux-based system (tested on Ubuntu)
+- Basic familiarity with running shell scripts
 
-## Building the Environments
-
-### Trimmed Environment
-To build the trimmed version of the environment, use the following command:
+## Getting Started
+Clone this repository and navigate to it:
 
 ```bash
-docker build -t sre-env-trimmed -f trimmed.Dockerfile .
+git clone git@github.com:kaiohenricunha/devenv.git
+cd devenv
 ```
 
-### Complete Environment
+## Running the Setup
 
-To build the complete version of the environment, use the following command:
+To set up your environment, run the main script:
 
-```bash
-docker build -t sre-env-complete -f complete.Dockerfile .
+```sh
+./main.sh
 ```
 
-Note: Replace complete.Dockerfile with the actual filename of the complete environment Dockerfile.
+This script installs necessary system packages and sets up various tools and configurations specified in separate scripts for each category.
 
-## Running the Environments
+## Included Tools
 
-### Basic Run
+- Programming Languages: Python, Go, Node.js, Rust, Java, Maven
+- Infrastructure-as-Code (IaC) Tools: Pulumi, Terraform, Terragrunt, Ansible and Crossplane
+- Cloud Tools: AWS CLI, Google Cloud SDK, Azure CLI, eksctl
+- Kubernetes Tools: kubectl, kubectx, kubens, Helm, Kubeshark
+- Other Tools: K6, Docker Compose, Minikube, Kind, Flux CLI, istioctl, version managers for all programming languages.
 
-This command runs the container in interactive mode and attaches a terminal to it.
+## Configuring Environments
 
-```bash
-docker run -it --name sre-lab sre-env-trimmed
+The setup script also configures AWS CLI profiles and updates kubeconfig files for different Kubernetes clusters.
+
+```sh
+# Configure AWS CLI
+aws configure set default.region us-east-1
+
+# Update kubeconfig for EKS-Management
+aws eks update-kubeconfig --region us-east-1 --name EKS-Management ...
+
+# Update kubeconfig for other clusters...
 ```
-
-### With AWS and Kubernetes Configurations
-
-To mount your AWS and Kubernetes configurations from your host into the container, use the following command:
-
-```bash
-docker run -it --name sre-lab \
-    -v ~/.aws:/home/sre/.aws \
-    -v ~/.kube:/home/sre/.kube \
-    sre-env-trimmed
-```
-
-Note: Adjust the paths if your configuration files are located elsewhere.
-
-## Customized Run
-
-You can customize the run command according to your needs. For example, to run the complete environment and mount specific directories, you can use:
-
-```bash
-docker run -it --name sre-lab \
-    -v /path/to/your/.aws:/home/sre/.aws \
-    -v /path/to/your/.kube:/home/sre/.kube \
-    sre-env-complete
-```
-
-Replace `/path/to/your/` with the actual path to your .aws and .kube directories.
 
 ## Contributing
 
-Contributions to this repository are welcome.
+Contributions to this repository are welcome. If you have suggestions or improvements, feel free to open an issue or pull request.
+
