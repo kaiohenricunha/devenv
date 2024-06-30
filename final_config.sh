@@ -1,16 +1,18 @@
-# Configure AWS CLI
-echo "Configuring AWS CLI..."
-aws configure set default.region us-east-1
+#!/bin/zsh
 
-# Configure AWS CLI
-aws configure set default.region us-east-1
+# # Configure AWS CLI
+# echo "Configuring AWS CLI..."
+# aws configure set default.region us-east-1
 
-# Update kubeconfig for EKS-Management
-aws eks update-kubeconfig --region us-east-1 --name EKS-Management ...
+# # Configure AWS CLI
+# aws configure set default.region us-east-1
 
-# Update kubeconfig for other clusters...
+# # Update kubeconfig for EKS-Management
+# aws eks update-kubeconfig --region us-east-1 --name EKS-Management ...
 
-echo "Kubernetes context setup complete."
+# # Update kubeconfig for other clusters...
+
+# echo "Kubernetes context setup complete."
 
 ## Reminder to restart the shell or environment
 echo "Please restart your shell or source the appropriate config file to use the updated environment."

@@ -1,6 +1,4 @@
-#!/bin/bash
-
-export ISTIO_VERSION="1.22.1"
+#!/bin/zsh
 
 # --------------------------#
 # Install other tools:
@@ -9,11 +7,15 @@ export ISTIO_VERSION="1.22.1"
 
 ## Check and install K6 for load testing
 if ! k6 --version 2>&1 | grep -q "k6"; then
-    echo "Installing K6..."
-    sudo gpg --no-default-keyring --keyring /usr/share/keyrings/k6-archive-keyring.gpg --keyserver hkp://keyserver.ubuntu.com:80 --recv-keys C5AD17C747E3415A3642D57D77C6C491D6AC1D69
-    echo "deb [signed-by=/usr/share/keyrings/k6-archive-keyring.gpg] https://dl.k6.io/deb stable main" | sudo tee /etc/apt/sources.list.d/k6.list
-    sudo apt-get update
-    sudo apt-get install -y k6
+    if [[ "$OS" == "Darwin" ]]; then
+        brew install k6
+    else
+        echo "Installing K6..."
+        sudo gpg --no-default-keyring --keyring /usr/share/keyrings/k6-archive-keyring.gpg --keyserver hkp://keyserver.ubuntu.com:80 --recv-keys C5AD17C747E3415A3642D57D77C6C491D6AC1D69
+        echo "deb [signed-by=/usr/share/keyrings/k6-archive-keyring.gpg] https://dl.k6.io/deb stable main" | sudo tee /etc/apt/sources.list.d/k6.list
+        sudo apt-get update
+        sudo apt-get install -y k6
+    fi
 else
     echo "K6 is already installed."
 fi
@@ -38,7 +40,7 @@ else
 fi
 
 ## Check and install Kind
-if ! kind version 2>&1 | grep -q "kind"; then
+if ! kind --version 2>&1 | grep -q "kind"; then
     echo "Installing Kind..."
     go install sigs.k8s.io/kind@v0.23.0
 else
@@ -46,20 +48,22 @@ else
 fi
 
 ## Check and install istioctl
-if ! istioctl version 2>&1 | grep -q "$ISTIO_VERSION"; then
+if ! istioctl version 2>&1 | grep -q ""; then
     echo "Installing istioctl..."
-    curl -L "https://github.com/istio/istio/releases/download/$ISTIO_VERSION/istio-$ISTIO_VERSION-linux-amd64.tar.gz" -o "istio-$ISTIO_VERSION.tar.gz"
-    tar -xzf "istio-$ISTIO_VERSION.tar.gz"
-    sudo mv "istio-$ISTIO_VERSION/bin/istioctl" /usr/local/bin/
-    rm -rf "istio-$ISTIO_VERSION" "istio-$ISTIO_VERSION.tar.gz"
+    curl -sL https://istio.io/downloadIstioctl | sh -
+    export PATH=$HOME/.istioctl/bin:$PATH
 else
     echo "istioctl is already installed."
 fi
 
 ## Check and install Flux CLI
-if ! flux version 2>&1 | grep -q "flux"; then
+if ! flux -v 2>&1 | grep -q "flux"; then
     echo "Installing Flux CLI..."
-    curl -s https://fluxcd.io/install.sh | sudo bash
+    if [[ "$OS" == "Darwin" ]]; then
+        brew install fluxcd/tap/flux
+    else
+        curl -s https://fluxcd.io/install.sh | sudo bash
+    fi
 else
     echo "Flux CLI is already installed."
 fi
@@ -71,6 +75,6 @@ echo "===================="
 k6 version
 docker-compose --version
 minikube version
-kind version
+kind --version
 istioctl version
 flux -v

@@ -1,13 +1,16 @@
 # Linux Environment Setup for DevOps and SRE
 
 ## Overview
-This repository contains scripts to set up a Linux environment tailored for DevOps and Site Reliability Engineering (SRE) tasks. It automates the installation of programming languages, infrastructure-as-code (IaC) tools, cloud tools, Kubernetes tools, and other utilities commonly used in DevOps workflows.
+
+This repository contains scripts to set up a Linux environment tailored for Platform Engineering an Developer tasks. It automates the installation of programming languages, infrastructure-as-code (IaC) tools, cloud tools, Kubernetes tools, and other utilities commonly used in these workflows.
 
 ## Prerequisites
-- A Linux-based system (tested on Ubuntu)
+
+- A Linux-based system (tested on Ubuntu) or macOS.
 - Basic familiarity with running shell scripts
 
 ## Getting Started
+
 Clone this repository and navigate to it:
 
 ```bash
@@ -21,6 +24,12 @@ To set up your environment, run the main script:
 
 ```sh
 ./main.sh
+```
+
+You may need to change the repository permissions:
+
+```bash
+chmod +x *.sh
 ```
 
 This script installs necessary system packages and sets up various tools and configurations specified in separate scripts for each category.
@@ -50,4 +59,3 @@ aws eks update-kubeconfig --region us-east-1 --name EKS-Management ...
 ## Contributing
 
 Contributions to this repository are welcome. If you have suggestions or improvements, feel free to open an issue or pull request.
-

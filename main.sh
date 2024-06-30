@@ -13,7 +13,7 @@ elif [[ $(uname -s) == "Linux" ]]; then
     # Ubuntu
     echo "Detected Ubuntu"
     sudo apt-get update
-    sudo apt-get install -y curl git vim make binutils bison gcc build-essential wget jq htop iftop tk-dev geomview tree xclip xsel shellcheck
+    sudo apt-get install -y curl git vim make binutils bison gcc build-essential wget jq htop iftop tk-dev geomview tree xclip xsel shellcheck apt-transport-https ca-certificates gnupg
 else
     echo "Unsupported operating system. Exiting."
     exit 1

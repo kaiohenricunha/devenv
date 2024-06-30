@@ -1,6 +1,5 @@
 #!/bin/zsh
 
-
 # --------------------------#
 # Install Kubernetes tools:
 # kubectl, kubectx, kubens, Helm, Kubeshark
