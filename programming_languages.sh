@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/bin/zsh
 
 export PYTHON_VERSION="3.11.4"
 export NODE_VERSION="20"
@@ -7,158 +7,145 @@ export GO_VERSION="go1.22.2"
 export RUST_VERSION="1.79.0"
 export MAVEN_VERSION="3.8.8"
 
-# --------------------------#
-# Install programming languages:
-# Python, Go, Node, Rust, Java, Maven
-# --------------------------#
+# Check the operating system
+OS=$(uname -s)
 
-## Python
+# Install pyenv if not already installed
+install_pyenv() {
+    if ! command -v pyenv &>/dev/null; then
+        if [[ "$OS" == "Darwin" ]]; then
+            echo "Installing pyenv using Homebrew..."
+            brew install pyenv
+        else
+            echo "Installing pyenv..."
+            curl https://pyenv.run | bash
+        fi
 
-### Install pyenv if not already installed
-if ! command -v pyenv &>/dev/null; then
-    echo "Installing pyenv..."
-    curl https://pyenv.run | bash
-    echo "pyenv installed successfully."
+        echo 'export PYENV_ROOT="$HOME/.pyenv"' >> ~/.zshrc
+        echo 'export PATH="$PYENV_ROOT/bin:$PATH"' >> ~/.zshrc
+        echo 'eval "$(pyenv init --path)"' >> ~/.zshrc
+        source ~/.zshrc  # Reload the shell configuration
+    else
+        echo "pyenv is already installed."
+    fi
+}
 
-    echo "Configuring pyenv shell for Zsh"
-    echo 'export PYENV_ROOT="$HOME/.pyenv"' >> ~/.zshrc
-    echo '[[ -d $PYENV_ROOT/bin ]] && export PATH="$PYENV_ROOT/bin:$PATH"' >> ~/.zshrc
-    echo 'eval "$(pyenv init -)"' >> ~/.zshrc
+# Install and set Python version
+install_python() {
+    if ! pyenv versions --bare | grep -q "^$PYTHON_VERSION\$"; then
+        echo "Installing Python $PYTHON_VERSION"
+        pyenv install $PYTHON_VERSION
+    else
+        echo "Python $PYTHON_VERSION is already installed."
+    fi
 
-    source ~/.zshrc
-else
-    echo "pyenv is already installed."
-fi
+    pyenv global $PYTHON_VERSION
+    python -m ensurepip --upgrade
+}
 
-### Check if the desired Python version is already installed and used
-if pyenv versions --bare | grep -q "^$PYTHON_VERSION\$"; then
-    echo "Python $PYTHON_VERSION is already installed."
-else
-    echo "Installing Python $PYTHON_VERSION"
-    pyenv install $PYTHON_VERSION
-    echo "Python installed successfully."
-fi
+# Install GVM and Go
+install_gvm_and_go() {
+    if [ ! -d "$HOME/.gvm" ]; then
+        bash < <(curl -s -S -L https://raw.githubusercontent.com/moovweb/gvm/master/binscripts/gvm-installer)
 
-### Set the specified Python version as global
-pyenv global $PYTHON_VERSION
-python -m ensurepip --upgrade
+        source $HOME/.gvm/scripts/gvm || {
+            echo "Failed to source GVM scripts."
+            exit 1
+        }
 
-## Go
+        # Install and use a Go version for bootstrap
+        gvm install go1.20.6 -B
+        gvm use go1.20.6
+        export GOROOT_BOOTSTRAP=$GOROOT
 
-### Install GVM and Go
-if [ ! -d "$HOME/.gvm" ]; then
-    bash < <(curl -s -S -L https://raw.githubusercontent.com/moovweb/gvm/master/binscripts/gvm-installer)
+        # Install target version of Go
+        gvm install $GO_VERSION
+    else
+        source $HOME/.gvm/scripts/gvm
+    fi
 
-    source $HOME/.gvm/scripts/gvm || {
-        echo "Failed to source GVM scripts."
-        exit 1
-    }
+    if gvm list | grep -q "$GO_VERSION"; then
+        echo "Go $GO_VERSION is already installed."
+    else
+        gvm install $GO_VERSION
+    fi
 
-    ### Install and use a Go version for bootstrap
-    gvm install go1.20.6 -B
-    gvm use go1.20.6
-    export GOROOT_BOOTSTRAP=$GOROOT
+    gvm use $GO_VERSION --default
+}
 
-    ### Install target version of Go
-    gvm install $GO_VERSION
-else
-    source $HOME/.gvm/scripts/gvm
-fi
+# Install Node.js using NVM
+install_nvm_and_node() {
+    export NVM_DIR="$HOME/.nvm"
+    [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"  # This loads nvm
+    if ! command -v nvm &>/dev/null; then
+        curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.3/install.sh | bash
+        source $NVM_DIR/nvm.sh  # Ensure the nvm command is available
+    else
+        echo "NVM is already installed."
+        source $NVM_DIR/nvm.sh
+    fi
 
-if gvm list | grep -q "$GO_VERSION"; then
-    echo "Go $GO_VERSION is already installed."
-else
-    gvm install $GO_VERSION
-fi
+    # Check if the desired Node.js version is already installed
+    if nvm list | grep -q "v$NODE_VERSION"; then
+        echo "Node.js $NODE_VERSION is already installed."
+    else
+        nvm install $NODE_VERSION
+        echo "Node.js $NODE_VERSION installed successfully."
+    fi
+}
 
-gvm use $GO_VERSION --default
+# Install Rust using rustup
+install_rust() {
+    if ! command -v rustc &>/dev/null; then
+        echo "Installing rustup..."
+        curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --profile minimal
 
-## Node
+        echo "export PATH=\"$HOME/.cargo/bin:\$PATH\"" >> ~/.zshrc
+        source ~/.zshrc
+    else
+        echo "Rust is already installed."
+    fi
 
-### Install Node.js using NVM
-export NVM_DIR="$HOME/.nvm"
-[ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"  # This loads nvm
-if ! command -v nvm &>/dev/null; then
-    curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.3/install.sh | bash
-    source $NVM_DIR/nvm.sh  # Ensure the nvm command is available
-else
-    echo "NVM is already installed."
-    source $NVM_DIR/nvm.sh
-fi
+    # Check if the desired Rust version is already installed and set as default
+    if rustc --version | grep -q "$RUST_VERSION"; then
+        echo "Rust $RUST_VERSION is already installed and set as default."
+    else
+        echo "Installing Rust version $RUST_VERSION"
+        rustup toolchain install $RUST_VERSION
+        rustup default $RUST_VERSION
+    fi
+}
 
-### Check if the desired Node.js version is already installed
-if nvm list | grep -q "v$NODE_VERSION"; then
-    echo "Node.js $NODE_VERSION is already installed."
-else
-    nvm install $NODE_VERSION
-    echo "Node.js $NODE_VERSION installed successfully."
-fi
-
-### Use the specified Node.js version
-nvm use $NODE_VERSION
-
-## Rust
-
-### Check if rustup is installed and if the desired Rust version is active
-if ! command -v rustc &>/dev/null; then
-    echo "Installing rustup..."
-    sudo apt update
-    sudo apt install -y rustup
-    rustup default stable
-    rustup update
-    echo "export PATH=\"$HOME/.cargo/bin:\$PATH\"" >> ~/.zshrc
-    source ~/.zshrc
-else
-    echo "Rust is already installed."
-fi
-
-### Check if the desired Rust version is already installed and set as default
-if rustc --version | grep -q "$RUST_VERSION"; then
-    echo "Rust $RUST_VERSION is already installed and set as default."
-else
-    echo "Installing Rust version $RUST_VERSION"
-    rustup toolchain install $RUST_VERSION
-    rustup default $RUST_VERSION
-fi
-
-## Java
-
-### Check if Jabba is installed
-if ! command -v jabba &>/dev/null; then
+# Install Java using Jabba
+install_java() {
     echo "Installing Jabba..."
     curl -sL https://github.com/shyiko/jabba/raw/master/install.sh | bash
+
     echo "source $HOME/.jabba/jabba.sh" >> ~/.zshrc
     source $HOME/.jabba/jabba.sh
-else
-    echo "Jabba is already installed."
-    source $HOME/.jabba/jabba.sh
-fi
 
-### Check if the desired Java version is already installed and set as default
-if jabba ls | grep -q "$JAVA_VERSION"; then
-    echo "Java $JAVA_VERSION is already installed."
-else
-    echo "Installing Java version $JAVA_VERSION"
-    jabba install "$JAVA_VERSION"
-    jabba use "$JAVA_VERSION"
-    jabba alias default "$JAVA_VERSION"
-fi
+    # Check if the desired Java version is already installed and set as default
+    if jabba ls | grep -q "$JAVA_VERSION"; then
+        echo "Java $JAVA_VERSION is already installed."
+    else
+        echo "Installing Java version $JAVA_VERSION"
+        jabba install "$JAVA_VERSION"
+        jabba use "$JAVA_VERSION"
+        jabba alias default "$JAVA_VERSION"
+    fi
+}
 
-## Maven
+# Main installation function
+main() {
+    install_pyenv
+    install_python
+    install_gvm_and_go
+    install_nvm_and_node
+    install_rust
+    install_java
+}
 
-### Install Maven if not already installed
-if ! command -v mvn &>/dev/null; then
-    echo "Installing Maven..."
-    curl -O https://downloads.apache.org/maven/maven-3/$MAVEN_VERSION/binaries/apache-maven-$MAVEN_VERSION-bin.tar.gz
-    tar xzvf apache-maven-$MAVEN_VERSION-bin.tar.gz
-    sudo mv apache-maven-$MAVEN_VERSION /opt/
-    sudo ln -s /opt/apache-maven-$MAVEN_VERSION/bin/mvn /usr/bin/mvn
-    echo "export PATH=/opt/apache-maven-$MAVEN_VERSION/bin:\$PATH" >> ~/.zshrc
-    source ~/.zshrc
-    rm apache-maven-$MAVEN_VERSION-bin.tar.gz
-else
-    echo "Maven is already installed."
-fi
+main
 
 echo "===================="
 echo "Installed languages"
@@ -169,4 +156,3 @@ echo "node: $(node --version)"
 rustc --version
 cargo --version
 java -version
-mvn -version

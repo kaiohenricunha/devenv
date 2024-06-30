@@ -1,20 +1,23 @@
-#!/bin/bash
+#!/bin/zsh
 
-# Prevent script from running as root
-if [ "$(id -u)" == "0" ]; then
-    echo "This script should not be run as root or using sudo. Exiting."
+# Install necessary system packages based on OS
+echo "Installing necessary system packages..."
+
+# Check if we're on macOS or Ubuntu
+if [[ $(uname -s) == "Darwin" ]]; then
+    # macOS
+    echo "Detected macOS"
+    brew update && brew upgrade
+    brew install curl git vim make binutils bison gcc wget jq htop iftop geomview tree xclip xsel shellcheck cosign
+elif [[ $(uname -s) == "Linux" ]]; then
+    # Ubuntu
+    echo "Detected Ubuntu"
+    sudo apt-get update
+    sudo apt-get install -y curl git vim make binutils bison gcc build-essential wget jq htop iftop tk-dev geomview tree xclip xsel shellcheck
+else
+    echo "Unsupported operating system. Exiting."
     exit 1
 fi
-
-# Install necessary system packages
-echo "Installing necessary system packages..."
-sudo apt-get update
-sudo apt-get install -y curl git make binutils bison gcc build-essential libssl-dev zlib1g-dev \
-                        libbz2-dev libreadline-dev libsqlite3-dev wget llvm libncursesw5-dev \
-                        xz-utils tk-dev libxml2-dev libxmlsec1-dev libffi-dev liblzma-dev jq \
-                        htop iftop tk-dev geomview tree xclip xsel shellcheck
-
-sudo snap install code --classic
 
 # Install programming languages
 ./programming_languages.sh
