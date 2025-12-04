@@ -82,17 +82,17 @@ fi
 # Install programming languages
 ./programming_languages.sh
 
-# # Install IaC tools
-# ./iac.sh
+# Install IaC tools
+./iac.sh
 
-# # Install cloud tools
-# ./cloud_tools.sh
+# Install cloud tools
+./cloud_tools.sh
 
-# # Install k8s tools
-# ./k8s_tools.sh
+# Install k8s tools
+./k8s_tools.sh
 
-# # Install other tools
-# ./other_tools.sh
+# Install other tools
+./other_tools.sh
 
-# # Configure contexts and additional adjustments
-# ./final_config.sh
+# Configure contexts and additional adjustments
+./final_config.sh
