@@ -1,150 +1,184 @@
-#!/bin/zsh
+#!/usr/bin/env bash
 
-export PYTHON_VERSION="3.11.4"
-export NODE_VERSION="20"
-export JAVA_VERSION="openjdk@1.17.0"
-export GO_VERSION="go1.22.2"
-export RUST_VERSION="1.79.0"
-export MAVEN_VERSION="3.8.8"
+set -euo pipefail
 
-# Check the operating system
-OS=$(uname -s)
+# Fixed versions to install
+PYTHON_VERSION="3.13.0"
+NODE_VERSION="22"          # major is enough for nvm
+GO_VERSION="go1.25.3"
+GO_BOOTSTRAP_VERSION="go1.22.6"  # used only for initial gvm bootstrap
+RUST_VERSION="1.82.0"
 
-# Install pyenv if not already installed
+log() {
+    printf "[programming_languages] %s\n" "$*"
+}
+
+append_once_to_zshrc() {
+    local line="$1"
+    if [[ -f "$HOME/.zshrc" ]] && grep -Fqx "$line" "$HOME/.zshrc"; then
+        return 0
+    fi
+    echo "$line" >>"$HOME/.zshrc"
+}
+
 install_pyenv() {
-    if ! command -v pyenv &>/dev/null; then
-        if [[ "$OS" == "Darwin" ]]; then
-            echo "Installing pyenv using Homebrew..."
-            brew install pyenv
+    if command -v pyenv >/dev/null 2>&1; then
+        log "pyenv already in PATH."
+    elif [[ -d "$HOME/.pyenv" ]]; then
+        log "~/.pyenv exists; wiring into PATH."
+    else
+        log "Installing pyenv..."
+        curl -fsSL https://pyenv.run | bash
+    fi
+
+    export PYENV_ROOT="$HOME/.pyenv"
+    export PATH="$PYENV_ROOT/bin:$PATH"
+
+    append_once_to_zshrc 'export PYENV_ROOT="$HOME/.pyenv"'
+    append_once_to_zshrc 'export PATH="$PYENV_ROOT/bin:$PATH"'
+    append_once_to_zshrc 'eval "$(pyenv init --path)"'
+    append_once_to_zshrc 'eval "$(pyenv init -)"'
+
+    if command -v pyenv >/dev/null 2>&1; then
+        eval "$(pyenv init --path)"
+        eval "$(pyenv init -)"
+    fi
+}
+
+install_python() {
+    if ! command -v pyenv >/dev/null 2>&1; then
+        log "pyenv not available; skipping Python."
+        return 0
+    fi
+
+    if ! pyenv versions --bare | grep -qx "$PYTHON_VERSION"; then
+        log "Installing Python $PYTHON_VERSION via pyenv..."
+        if ! pyenv install "$PYTHON_VERSION"; then
+            log "WARNING: failed to install Python $PYTHON_VERSION; continuing."
+            return 0
+        fi
+    else
+        log "Python $PYTHON_VERSION already installed in pyenv."
+    fi
+
+    if pyenv global "$PYTHON_VERSION"; then
+        python -m ensurepip --upgrade || true
+    else
+        log "WARNING: could not set global Python $PYTHON_VERSION."
+    fi
+}
+
+install_gvm_and_go() {
+    log "Installing gvm and Go..."
+
+    if [[ ! -d "$HOME/.gvm" ]]; then
+        log "Installing gvm..."
+        if ! curl -fsSL https://raw.githubusercontent.com/moovweb/gvm/master/binscripts/gvm-installer | bash; then
+            log "WARNING: gvm installer failed; skipping Go."
+            return 0
+        fi
+        append_once_to_zshrc '[[ -s "$HOME/.gvm/scripts/gvm" ]] && source "$HOME/.gvm/scripts/gvm"'
+    else
+        log "gvm already present."
+    fi
+
+    if [[ ! -s "$HOME/.gvm/scripts/gvm" ]]; then
+        log "GVM scripts missing; skipping Go."
+        return 0
+    fi
+
+    # Run gvm in a subshell with relaxed settings so its internals
+    # (which reference ZSH_VERSION/GVM_DEBUG) don't break this script.
+    (
+        set +euo pipefail
+        : "${ZSH_VERSION:=}"
+        : "${GVM_DEBUG:=}"
+        # shellcheck disable=SC1090
+        source "$HOME/.gvm/scripts/gvm" || exit 0
+
+        if ! gvm list 2>/dev/null | grep -Fxq "$GO_BOOTSTRAP_VERSION"; then
+            echo "[programming_languages] Installing Go bootstrap $GO_BOOTSTRAP_VERSION..."
+            gvm install "$GO_BOOTSTRAP_VERSION" -B || true
         else
-            echo "Installing pyenv..."
-            curl https://pyenv.run | bash
+            echo "[programming_languages] Bootstrap $GO_BOOTSTRAP_VERSION already installed."
         fi
 
-        echo 'export PYENV_ROOT="$HOME/.pyenv"' >> ~/.zshrc
-        echo 'export PATH="$PYENV_ROOT/bin:$PATH"' >> ~/.zshrc
-        echo 'eval "$(pyenv init --path)"' >> ~/.zshrc
-        echo 'eval "$(pyenv init -)"' >> ~/.zshrc
-        echo 'eval "$(pyenv virtualenv-init -)"' >> ~/.zshrc
-        source ~/.zshrc  # Reload the shell configuration
-    else
-        echo "pyenv is already installed."
-    fi
+        gvm use "$GO_BOOTSTRAP_VERSION" --default || true
+        export GOROOT_BOOTSTRAP="${GOROOT:-}"
+
+        if ! gvm list 2>/dev/null | grep -Fxq "$GO_VERSION"; then
+            echo "[programming_languages] Installing Go $GO_VERSION..."
+            gvm install "$GO_VERSION" || true
+        else
+            echo "[programming_languages] Go $GO_VERSION already installed."
+        fi
+
+        gvm use "$GO_VERSION" --default || true
+    ) || true
 }
 
-# Install and set Python version
-install_python() {
-    if ! pyenv versions --bare | grep -q "^$PYTHON_VERSION\$"; then
-        echo "Installing Python $PYTHON_VERSION"
-        pyenv install $PYTHON_VERSION
-    else
-        echo "Python $PYTHON_VERSION is already installed."
-    fi
-
-    pyenv global $PYTHON_VERSION
-    python -m ensurepip --upgrade
-}
-
-# Install GVM and Go
-install_gvm_and_go() {
-    if [ ! -d "$HOME/.gvm" ]; then
-        bash < <(curl -s -S -L https://raw.githubusercontent.com/moovweb/gvm/master/binscripts/gvm-installer)
-
-        source $HOME/.gvm/scripts/gvm || {
-            echo "Failed to source GVM scripts."
-            exit 1
-        }
-
-        # Install and use a Go version for bootstrap
-        gvm install go1.20.6 -B
-        gvm use go1.20.6
-        export GOROOT_BOOTSTRAP=$GOROOT
-
-        # Install target version of Go
-        gvm install $GO_VERSION
-    else
-        source $HOME/.gvm/scripts/gvm
-    fi
-
-    if gvm list | grep -q "$GO_VERSION"; then
-        echo "Go $GO_VERSION is already installed."
-    else
-        gvm install $GO_VERSION
-    fi
-
-    gvm use $GO_VERSION --default
-}
-
-# Install Node.js using NVM
 install_nvm_and_node() {
     export NVM_DIR="$HOME/.nvm"
-    [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"  # This loads nvm
-    if ! command -v nvm &>/dev/null; then
-        curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.3/install.sh | bash
-        source $NVM_DIR/nvm.sh  # Ensure the nvm command is available
-    else
-        echo "NVM is already installed."
-        source $NVM_DIR/nvm.sh
+
+    if [[ ! -s "$NVM_DIR/nvm.sh" ]] && ! command -v nvm >/dev/null 2>&1; then
+        log "Installing nvm..."
+        curl -fsSL https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.7/install.sh | bash
     fi
 
-    # Check if the desired Node.js version is already installed
-    if nvm list | grep -q "v$NODE_VERSION"; then
-        echo "Node.js $NODE_VERSION is already installed."
-    else
-        nvm install $NODE_VERSION
-        echo "Node.js $NODE_VERSION installed successfully."
-    fi
+    append_once_to_zshrc 'export NVM_DIR="$HOME/.nvm"'
+    append_once_to_zshrc '[ -s "$NVM_DIR/nvm.sh" ] && . "$NVM_DIR/nvm.sh"'
+
+    # Run nvm in a subshell to avoid set -u issues
+    (
+        set +euo pipefail
+        if [[ -s "$NVM_DIR/nvm.sh" ]]; then
+            # shellcheck disable=SC1090
+            . "$NVM_DIR/nvm.sh"
+        else
+            log "nvm.sh not found; skipping Node."
+            exit 0
+        fi
+
+        if nvm list | grep -q "v$NODE_VERSION"; then
+            log "Node.js $NODE_VERSION already installed."
+        else
+            log "Installing Node.js $NODE_VERSION via nvm..."
+            nvm install "$NODE_VERSION"
+        fi
+
+        nvm alias default "$NODE_VERSION" || true
+    )
 }
 
-# Install Rust using rustup
 install_rust() {
-    if ! command -v rustc &>/dev/null; then
-        echo "Installing rustup..."
-        curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --profile minimal
-
-        echo "export PATH=\"$HOME/.cargo/bin:\$PATH\"" >> ~/.zshrc
-        source ~/.zshrc
-    else
-        echo "Rust is already installed."
+    if ! command -v rustup >/dev/null 2>&1 && ! command -v rustc >/dev/null 2>&1; then
+        log "Installing rustup..."
+        curl --proto '=https' --tlsv1.2 -fsSL https://sh.rustup.rs | sh -s -- -y --profile minimal
+        append_once_to_zshrc 'export PATH="$HOME/.cargo/bin:$PATH"'
     fi
 
-    # Check if the desired Rust version is already installed and set as default
-    if rustc --version | grep -q "$RUST_VERSION"; then
-        echo "Rust $RUST_VERSION is already installed and set as default."
-    else
-        echo "Installing Rust version $RUST_VERSION"
-        rustup toolchain install $RUST_VERSION
-        rustup default $RUST_VERSION
+    export PATH="$HOME/.cargo/bin:$PATH"
+
+    if ! command -v rustup >/dev/null 2>&1; then
+        log "rustup not available; skipping Rust."
+        return 0
     fi
-}
 
-# Install Java using Jabba
-install_java() {
-    echo "Installing Jabba..."
-    curl -sL https://github.com/shyiko/jabba/raw/master/install.sh | bash
-
-    echo "source $HOME/.jabba/jabba.sh" >> ~/.zshrc
-    source $HOME/.jabba/jabba.sh
-
-    # Check if the desired Java version is already installed and set as default
-    if jabba ls | grep -q "$JAVA_VERSION"; then
-        echo "Java $JAVA_VERSION is already installed."
+    if rustc --version 2>/dev/null | grep -q "$RUST_VERSION"; then
+        log "Rust $RUST_VERSION already active."
     else
-        echo "Installing Java version $JAVA_VERSION"
-        jabba install "$JAVA_VERSION"
-        jabba use "$JAVA_VERSION"
-        jabba alias default "$JAVA_VERSION"
+        log "Installing Rust $RUST_VERSION via rustup..."
+        rustup toolchain install "$RUST_VERSION"
+        rustup default "$RUST_VERSION"
     fi
 }
 
-# Main installation function
 main() {
     install_pyenv
     install_python
     install_gvm_and_go
     install_nvm_and_node
     install_rust
-    install_java
 }
 
 main
@@ -152,9 +186,8 @@ main
 echo "===================="
 echo "Installed languages"
 echo "===================="
-python --version
-go version
-echo "node: $(node --version)"
-rustc --version
-cargo --version
-java -version
+command -v python &>/dev/null && python --version || echo "python: not available"
+command -v go &>/dev/null && go version || echo "go: not available"
+command -v node &>/dev/null && echo "node: $(node --version)" || echo "node: not available"
+command -v rustc &>/dev/null && rustc --version || echo "rustc: not available"
+command -v cargo &>/dev/null && cargo --version || echo "cargo: not available"

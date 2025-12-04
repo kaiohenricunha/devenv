@@ -1,35 +1,21 @@
-#!/bin/zsh
+#!/usr/bin/env bash
 
-# Install necessary system packages based on OS
-echo "Installing necessary system packages..."
+set -euo pipefail
 
-# Check if we're on macOS or Ubuntu
-if [[ $(uname -s) == "Darwin" ]]; then
-    # macOS
-    echo "Detected macOS"
-    brew update && brew upgrade
-    brew install curl git vim make binutils bison gcc wget jq htop iftop geomview tree xclip xsel shellcheck cosign
-elif [[ $(uname -s) == "Linux" ]]; then
-    # Ubuntu
-    echo "Detected Ubuntu"
-    sudo apt-get update
-    sudo apt-get install -y curl git vim make binutils bison gcc build-essential wget jq htop iftop tk-dev geomview tree xclip xsel shellcheck apt-transport-https ca-certificates gnupg
-
-    # Install Homebrew
-    if ! command -v brew &> /dev/null; then
-        echo "Installing Homebrew..."
-        /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
-        echo 'eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)"' >>~/.zshrc
-        eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)"
-    else
-        echo "Homebrew is already installed."
-    fi
-
-    # Ensure Homebrew is in the PATH
-    test -d ~/.linuxbrew && eval "$(~/.linuxbrew/bin/brew shellenv)"
-    test -d /home/linuxbrew/.linuxbrew && eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)"
-    echo "eval \"\$($(brew --prefix)/bin/brew shellenv)\"" >> ~/.zshrc
+if [[ $(uname -s) != "Linux" ]]; then
+    echo "This setup script is intended to run on Linux only." >&2
+    exit 1
 fi
+
+echo "Detected Linux (Pop!_OS / Ubuntu-based). Installing necessary system packages..."
+
+sudo apt-get update
+sudo apt-get install -y \
+    curl git vim make binutils bison gcc build-essential wget jq htop iftop \
+    tk-dev geomview tree xclip xsel shellcheck apt-transport-https \
+    ca-certificates gnupg \
+    zlib1g-dev libbz2-dev libreadline-dev libsqlite3-dev libssl-dev \
+    libncurses5-dev libncursesw5-dev libffi-dev liblzma-dev
 
 # --------------------------#
 # Install/configure ZSH and Oh My Zsh
@@ -39,7 +25,7 @@ fi
 if [[ ! -d "$HOME/.oh-my-zsh" ]]; then
     echo "Installing ZSH and Oh My Zsh..."
     sudo apt install -y zsh-autosuggestions zsh-syntax-highlighting zsh
-    sh -c "$(curl -fsSL https://raw.githubusercontent.com/ohmyzsh/ohmyzsh/master/tools/install.sh)"
+    sh -c "$(curl -fsSL https://raw.githubusercontent.com/ohmyzsh/ohmyzsh/master/tools/install.sh)" || true
 else
     echo "Oh My Zsh is already installed."
 fi
@@ -64,26 +50,49 @@ if [[ ! -d "$ZSH_CUSTOM/plugins/zsh-autocomplete" ]]; then
     git clone --depth 1 -- https://github.com/marlonrichert/zsh-autocomplete.git $ZSH_CUSTOM/plugins/zsh-autocomplete
 fi
 
-## Enable plugins by adding them to .zshrc
-if ! grep -q "zsh-autosuggestions" ~/.zshrc; then
-    echo "Enabling plugins in .zshrc..."
-    sed -i.bak 's/plugins=(git)/plugins=(git zsh-autosuggestions zsh-syntax-highlighting fast-syntax-highlighting zsh-autocomplete)/' ~/.zshrc
+## Enable plugins by adding them to .zshrc (idempotent)
+if [[ -f "$HOME/.zshrc" ]]; then
+    # Only rewrite if our core plugins are not yet present
+    if ! grep -q "zsh-autosuggestions" "$HOME/.zshrc" || \
+       ! grep -q "vscode" "$HOME/.zshrc" || \
+       ! grep -q "golang" "$HOME/.zshrc" || \
+       ! grep -q "terraform" "$HOME/.zshrc" || \
+       ! grep -q "kubectx" "$HOME/.zshrc" || \
+       ! grep -q "operator-sdk" "$HOME/.zshrc" || \
+       ! grep -q "kube-ps1" "$HOME/.zshrc"; then
+        echo "Enabling plugins in .zshrc..."
+        cp "$HOME/.zshrc" "$HOME/.zshrc.bak.devenv" || true
+        awk '
+            BEGIN { in_plugins = 0 }
+            /^plugins=\(/ {
+                in_plugins = 1
+                printf "plugins=(git vscode golang terraform kubectx operator-sdk kube-ps1 zsh-autosuggestions zsh-syntax-highlighting fast-syntax-highlighting zsh-autocomplete)\n"
+                next
+            }
+            in_plugins && /\)/ {
+                in_plugins = 1
+                next
+            }
+            { print }
+        ' "$HOME/.zshrc" > "$HOME/.zshrc.devenv.tmp"
+        mv "$HOME/.zshrc.devenv.tmp" "$HOME/.zshrc"
+    fi
 fi
 
 # Install programming languages
 ./programming_languages.sh
 
-# Install IaC tools
-./iac.sh
+# # Install IaC tools
+# ./iac.sh
 
-# Install cloud tools
-./cloud_tools.sh
+# # Install cloud tools
+# ./cloud_tools.sh
 
-# Install k8s tools
-./k8s_tools.sh
+# # Install k8s tools
+# ./k8s_tools.sh
 
-# Install other tools
-./other_tools.sh
+# # Install other tools
+# ./other_tools.sh
 
-# Configure contexts and additional adjustments
-./final_config.sh
+# # Configure contexts and additional adjustments
+# ./final_config.sh
