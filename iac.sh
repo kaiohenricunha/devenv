@@ -31,12 +31,22 @@ install_tenv() {
     if [[ "$OS" == "Darwin" ]]; then
       brew install tenv
     else
-      curl -fsSL -o tenv.tar.gz \
+      local tmpdir
+      tmpdir="$(mktemp -d)"
+      trap 'rm -rf "$tmpdir"' RETURN
+
+      curl -fsSL -o "$tmpdir/tenv.tar.gz" \
         "https://github.com/tofuutils/tenv/releases/download/v$TENV_VERSION/tenv_v${TENV_VERSION}_Linux_x86_64.tar.gz"
-      tar -xzf tenv.tar.gz
-      chmod +x tenv
-      sudo mv tenv /usr/local/bin/
-      rm tenv.tar.gz
+      tar -xzf "$tmpdir/tenv.tar.gz" -C "$tmpdir"
+
+      # tenv release tarballs can contain the main `tenv` binary plus tool proxy binaries
+      # (terraform/tofu/terragrunt/terramate/atmos/tf). Install whatever is present.
+      for bin in tenv terraform tofu terragrunt terramate atmos tf; do
+        if [[ -f "$tmpdir/$bin" ]]; then
+          chmod +x "$tmpdir/$bin"
+          sudo install -m 0755 "$tmpdir/$bin" /usr/local/bin/"$bin"
+        fi
+      done
     fi
   else
     echo "tenv already installed (assuming up-to-date or managed elsewhere)."

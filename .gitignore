@@ -2,3 +2,11 @@ annotations.md
 
 # Snyk Security Extension - AI Rules (auto-generated)
 .github/instructions/snyk_rules.instructions.md
+
+# Local tool proxy binaries (should be installed to PATH, not committed)
+/atmos
+/terraform
+/terragrunt
+/terramate
+/tf
+/tofu
