@@ -24,6 +24,64 @@ install_kubectl() {
   fi
 }
 
+ensure_line_in_file() {
+  local file="$1"
+  local line="$2"
+
+  [[ -f "$file" ]] || return 0
+  if grep -Fqx "$line" "$file"; then
+    return 0
+  fi
+
+  printf "\n%s\n" "$line" >>"$file"
+}
+
+install_krew() {
+  # Krew is a kubectl plugin manager. It installs into ~/.krew by default.
+  # Idempotent detection: either kubectl krew works or the krew binary exists.
+  local krew_bin="$HOME/.krew/bin/kubectl-krew"
+  local path_line='export PATH="${KREW_ROOT:-$HOME/.krew}/bin:$PATH"'
+
+  if [[ -x "$krew_bin" ]] || (command -v kubectl >/dev/null 2>&1 && kubectl krew version >/dev/null 2>&1); then
+    log "krew already installed."
+  else
+    log "Installing krew (kubectl plugin manager)..."
+
+    local os arch krew tmpdir
+    os="$(uname -s | tr '[:upper:]' '[:lower:]')"
+    arch="$(uname -m)"
+    case "$arch" in
+      x86_64) arch="amd64" ;;
+      aarch64) arch="arm64" ;;
+      arm64) arch="arm64" ;;
+      *)
+        echo "[k8s_tools] ERROR: Unsupported architecture for krew: $(uname -m)" >&2
+        return 1
+        ;;
+    esac
+
+    krew="krew-${os}_${arch}"
+    tmpdir="$(mktemp -d)"
+    trap 'rm -rf "$tmpdir"' RETURN
+
+    (
+      cd "$tmpdir"
+      curl -fsSLO "https://github.com/kubernetes-sigs/krew/releases/latest/download/${krew}.tar.gz"
+      tar -xzf "${krew}.tar.gz"
+      ./${krew} install krew
+    )
+  fi
+
+  # Ensure PATH is set for current script run (so subsequent steps can use kubectl krew).
+  export PATH="${KREW_ROOT:-$HOME/.krew}/bin:$PATH"
+
+  # Persist PATH change for interactive shells without overwriting user config.
+  ensure_line_in_file "$HOME/.zshrc" "$path_line"
+  ensure_line_in_file "$HOME/.bashrc" "$path_line"
+
+  log "NOTE: open a new shell (or re-login) for krew PATH to apply everywhere."
+}
+
 install_kubectx_kubens() {
   if ! command -v kubectx >/dev/null 2>&1 || ! command -v kubens >/dev/null 2>&1; then
     log "Installing kubectx + kubens..."
@@ -109,13 +167,40 @@ install_kind() {
   fi
 }
 
+install_lens() {
+  # Lens on Ubuntu/Pop!_OS is commonly distributed via Snap as "kontena-lens".
+  # Keep this idempotent and avoid writing repo-local binaries.
+  if command -v kontena-lens >/dev/null 2>&1; then
+    log "Lens (kontena-lens) already installed."
+    return 0
+  fi
+
+  if ! command -v snap >/dev/null 2>&1; then
+    log "Installing snapd (required for Lens)..."
+    sudo apt-get update
+    sudo apt-get install -y snapd
+    # Ensure snap is usable on systems where it's socket-activated.
+    sudo systemctl enable --now snapd.socket >/dev/null 2>&1 || true
+  fi
+
+  if snap list kontena-lens >/dev/null 2>&1; then
+    log "Lens (kontena-lens) already installed (snap)."
+    return 0
+  fi
+
+  log "Installing Lens (kontena-lens) via snap..."
+  sudo snap install kontena-lens --classic
+}
+
 main() {
   install_kubectl
+  install_krew
   install_kubectx_kubens
   install_helm
   install_docker
   install_minikube
   install_kind
+  install_lens
 
   echo "===================="
   echo "Installed Kubernetes / local-cluster tools"
@@ -168,6 +253,18 @@ main() {
   else
       echo "kind: not installed"
   fi
+
+    if [[ -x "$HOME/.krew/bin/kubectl-krew" ]] || (command -v kubectl >/dev/null 2>&1 && kubectl krew version >/dev/null 2>&1); then
+      echo "krew: installed"
+    else
+      echo "krew: not installed"
+    fi
+
+    if command -v kontena-lens >/dev/null 2>&1; then
+      echo "lens: installed (kontena-lens)"
+    else
+      echo "lens: not installed"
+    fi
 }
 
 main

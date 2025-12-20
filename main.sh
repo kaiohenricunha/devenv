@@ -249,6 +249,13 @@ maybe_make_kitty_safe
 # Install other tools
 ./other_tools.sh
 
+# Install virtualization stack (KVM/QEMU + libvirt + virt-manager)
+if [[ -x "./virtualization.sh" ]]; then
+    ./virtualization.sh
+else
+    echo "[main] virtualization.sh not found or not executable; skipping virtualization setup."
+fi
+
 # Configure contexts and additional adjustments
 ./final_config.sh
 
