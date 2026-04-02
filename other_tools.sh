@@ -16,7 +16,7 @@ append_once_to_file() {
     return 0
   fi
 
-  echo "$line" >>"$file"
+  printf '\n%s\n' "$line" >>"$file"
 }
 
 is_wsl() {
@@ -68,7 +68,10 @@ install_ghostty_wsl() {
     fi
   else
     echo "Cloning Ghostty source..."
-    git clone https://github.com/ghostty-org/ghostty "$ghostty_repo"
+    if ! git clone https://github.com/ghostty-org/ghostty "$ghostty_repo"; then
+      echo "ERROR: failed to clone Ghostty source repository into $ghostty_repo." >&2
+      return 1
+    fi
   fi
 
   echo "Building Ghostty from source..."
