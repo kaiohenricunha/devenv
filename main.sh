@@ -246,6 +246,22 @@ maybe_make_kitty_safe
 # Install k8s tools
 ./k8s_tools.sh
 
+# Install AI tools
+if ! command -v npm >/dev/null 2>&1; then
+    if [[ -s "$HOME/.nvm/nvm.sh" ]]; then
+        # Load nvm into the current shell so npm/node installed via nvm are usable here.
+        # shellcheck disable=SC1091
+        . "$HOME/.nvm/nvm.sh"
+        nvm use default >/dev/null 2>&1 || true
+    fi
+fi
+
+if command -v npm >/dev/null 2>&1; then
+    ./ai_tools.sh
+else
+    echo "[main] npm not found on PATH; skipping AI tools setup."
+fi
+
 # Install other tools
 ./other_tools.sh
 
