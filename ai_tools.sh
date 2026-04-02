@@ -31,8 +31,14 @@ ensure_npm() {
 }
 
 ensure_npm_global_bin_on_path() {
+  local npm_global_prefix=""
   local npm_global_bin=""
-  npm_global_bin="$(npm prefix -g 2>/dev/null)/bin"
+  npm_global_prefix="$(npm prefix -g 2>/dev/null || true)"
+  if [[ -z "$npm_global_prefix" ]]; then
+    return 0
+  fi
+
+  npm_global_bin="$npm_global_prefix/bin"
   if [[ -n "$npm_global_bin" && -d "$npm_global_bin" && ":$PATH:" != *":$npm_global_bin:"* ]]; then
     export PATH="$npm_global_bin:$PATH"
   fi
@@ -45,6 +51,11 @@ print_tool_version() {
   else
     echo "$tool: not installed"
   fi
+}
+
+print_path_guidance() {
+  local tool="$1"
+  echo "$tool installed but '$tool' is not on PATH in this shell. Try: export PATH=\"\$(npm prefix -g)/bin:\$PATH\""
 }
 
 install_claude_code() {
@@ -61,7 +72,7 @@ install_claude_code() {
     echo "Claude Code installed:"
     print_tool_version claude
   else
-    echo "Claude Code installed but 'claude' is not on PATH in this shell. Try: export PATH=\"\$(npm prefix -g)/bin:\$PATH\""
+    print_path_guidance claude
   fi
 }
 
@@ -79,7 +90,7 @@ install_copilot_cli() {
     echo "GitHub Copilot CLI installed:"
     print_tool_version copilot
   else
-    echo "GitHub Copilot CLI installed but 'copilot' is not on PATH in this shell. Try: export PATH=\"\$(npm prefix -g)/bin:\$PATH\""
+    print_path_guidance copilot
   fi
 }
 
@@ -97,7 +108,7 @@ install_codex() {
     echo "Codex installed:"
     print_tool_version codex
   else
-    echo "Codex installed but 'codex' is not on PATH in this shell. Try: export PATH=\"\$(npm prefix -g)/bin:\$PATH\""
+    print_path_guidance codex
   fi
 }
 
