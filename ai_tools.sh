@@ -61,7 +61,7 @@ install_claude_code() {
     echo "Claude Code installed:"
     print_tool_version claude
   else
-    echo "Claude Code installed but 'claude' command is not on PATH in this shell."
+    echo "Claude Code installed but 'claude' is not on PATH in this shell. Try: export PATH=\"\$(npm prefix -g)/bin:\$PATH\""
   fi
 }
 
@@ -79,7 +79,7 @@ install_copilot_cli() {
     echo "GitHub Copilot CLI installed:"
     print_tool_version copilot
   else
-    echo "GitHub Copilot CLI installed but 'copilot' command is not on PATH in this shell."
+    echo "GitHub Copilot CLI installed but 'copilot' is not on PATH in this shell. Try: export PATH=\"\$(npm prefix -g)/bin:\$PATH\""
   fi
 }
 
@@ -97,7 +97,7 @@ install_codex() {
     echo "Codex installed:"
     print_tool_version codex
   else
-    echo "Codex installed but 'codex' command is not on PATH in this shell."
+    echo "Codex installed but 'codex' is not on PATH in this shell. Try: export PATH=\"\$(npm prefix -g)/bin:\$PATH\""
   fi
 }
 
