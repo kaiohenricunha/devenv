@@ -246,6 +246,9 @@ maybe_make_kitty_safe
 # Install k8s tools
 ./k8s_tools.sh
 
+# Install AI tools
+./ai_tools.sh
+
 # Install other tools
 ./other_tools.sh
 
