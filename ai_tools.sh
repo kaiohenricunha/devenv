@@ -7,7 +7,21 @@ if [[ "$(uname -s)" != "Linux" ]]; then
   exit 1
 fi
 
+load_nvm() {
+  local nvm_dir="${NVM_DIR:-$HOME/.nvm}"
+  if [[ -s "$nvm_dir/nvm.sh" ]]; then
+    # shellcheck disable=SC1091
+    . "$nvm_dir/nvm.sh"
+    nvm use default >/dev/null 2>&1 || true
+  fi
+}
+
 ensure_npm() {
+  if command -v npm >/dev/null 2>&1; then
+    return 0
+  fi
+
+  load_nvm
   if command -v npm >/dev/null 2>&1; then
     return 0
   fi
@@ -16,41 +30,80 @@ ensure_npm() {
   exit 1
 }
 
+ensure_npm_global_bin_on_path() {
+  local npm_global_bin=""
+  npm_global_bin="$(npm prefix -g 2>/dev/null)/bin"
+  if [[ -n "$npm_global_bin" && -d "$npm_global_bin" && ":$PATH:" != *":$npm_global_bin:"* ]]; then
+    export PATH="$npm_global_bin:$PATH"
+  fi
+}
+
+print_tool_version() {
+  local tool="$1"
+  if command -v "$tool" >/dev/null 2>&1; then
+    "$tool" --version
+  else
+    echo "$tool: not installed"
+  fi
+}
+
 install_claude_code() {
   if command -v claude >/dev/null 2>&1; then
-    echo "Claude Code is already installed: $(claude --version)"
+    echo "Claude Code is already installed:"
+    print_tool_version claude
     return 0
   fi
 
   echo "Installing Claude Code..."
   npm install -g @anthropic-ai/claude-code
-  echo "Claude Code installed: $(claude --version)"
+  ensure_npm_global_bin_on_path
+  if command -v claude >/dev/null 2>&1; then
+    echo "Claude Code installed:"
+    print_tool_version claude
+  else
+    echo "Claude Code installed but 'claude' command is not on PATH in this shell."
+  fi
 }
 
 install_copilot_cli() {
   if command -v copilot >/dev/null 2>&1; then
-    echo "GitHub Copilot CLI is already installed: $(copilot --version)"
+    echo "GitHub Copilot CLI is already installed:"
+    print_tool_version copilot
     return 0
   fi
 
   echo "Installing GitHub Copilot CLI..."
   npm install -g @github/copilot
-  echo "GitHub Copilot CLI installed: $(copilot --version)"
+  ensure_npm_global_bin_on_path
+  if command -v copilot >/dev/null 2>&1; then
+    echo "GitHub Copilot CLI installed:"
+    print_tool_version copilot
+  else
+    echo "GitHub Copilot CLI installed but 'copilot' command is not on PATH in this shell."
+  fi
 }
 
 install_codex() {
   if command -v codex >/dev/null 2>&1; then
-    echo "Codex is already installed: $(codex --version)"
+    echo "Codex is already installed:"
+    print_tool_version codex
     return 0
   fi
 
   echo "Installing Codex..."
   npm install -g @openai/codex
-  echo "Codex installed: $(codex --version)"
+  ensure_npm_global_bin_on_path
+  if command -v codex >/dev/null 2>&1; then
+    echo "Codex installed:"
+    print_tool_version codex
+  else
+    echo "Codex installed but 'codex' command is not on PATH in this shell."
+  fi
 }
 
 main() {
   ensure_npm
+  ensure_npm_global_bin_on_path
   install_claude_code
   install_copilot_cli
   install_codex
@@ -58,9 +111,9 @@ main() {
   echo "===================="
   echo "Installed AI tools"
   echo "===================="
-  claude --version || echo "claude: not installed"
-  copilot --version || echo "copilot: not installed"
-  codex --version || echo "codex: not installed"
+  print_tool_version claude
+  print_tool_version copilot
+  print_tool_version codex
 }
 
 main
