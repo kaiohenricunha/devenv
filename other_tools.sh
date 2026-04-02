@@ -24,6 +24,7 @@ is_wsl() {
 }
 
 get_ghostty_version() {
+  # Prefer --version, but keep +version fallback for builds that expose it.
   ghostty --version 2>/dev/null || ghostty +version 2>/dev/null || echo "version unknown"
 }
 
@@ -158,7 +159,7 @@ main() {
   echo "Installed tool versions"
   echo "===================="
   if command -v ghostty >/dev/null 2>&1; then
-    get_ghostty_version
+    echo "ghostty: $(get_ghostty_version)"
   else
     echo "ghostty: not installed"
   fi

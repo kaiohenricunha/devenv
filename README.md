@@ -183,6 +183,12 @@ After running the setup, open a new shell session and run:
 ghostty --version
 ```
 
+If your Ghostty build does not support `--version`, run:
+
+```sh
+ghostty +version
+```
+
 </details>
 
 
