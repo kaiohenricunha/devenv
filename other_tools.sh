@@ -23,6 +23,10 @@ is_wsl() {
   [[ -n "${WSL_DISTRO_NAME:-}" ]] || [[ -n "${WSL_INTEROP:-}" ]] || grep -qiE "(microsoft|wsl)" /proc/version
 }
 
+get_ghostty_version() {
+  ghostty --version 2>/dev/null || ghostty +version 2>/dev/null || echo "version unknown"
+}
+
 install_ghostty_wsl() {
   if ! is_wsl; then
     echo "WSL not detected. Skipping Ghostty setup."
@@ -30,7 +34,7 @@ install_ghostty_wsl() {
   fi
 
   if command -v ghostty >/dev/null 2>&1; then
-    echo "Ghostty is already installed: $(ghostty --version 2>/dev/null || ghostty +version 2>/dev/null || echo 'version unknown')"
+    echo "Ghostty is already installed: $(get_ghostty_version)"
     return 0
   fi
 
@@ -42,6 +46,14 @@ install_ghostty_wsl() {
     libfontconfig1-dev libfreetype6-dev libharfbuzz-dev libpng-dev \
     zig
 
+  local zig_version
+  zig_version="$(zig version 2>/dev/null || true)"
+  if [[ -z "$zig_version" ]]; then
+    echo "ERROR: zig is not available after installation." >&2
+    return 1
+  fi
+  echo "Using zig version: $zig_version"
+
   local ghostty_repo="$HOME/.local/src/ghostty"
   local ghostty_bin="$HOME/.local/bin/ghostty"
 
@@ -49,17 +61,23 @@ install_ghostty_wsl() {
 
   if [[ -d "$ghostty_repo/.git" ]]; then
     echo "Ghostty source already present. Updating..."
-    git -C "$ghostty_repo" pull --ff-only
+    if ! git -C "$ghostty_repo" pull --ff-only; then
+      echo "ERROR: failed to update Ghostty source repository at $ghostty_repo." >&2
+      return 1
+    fi
   else
     echo "Cloning Ghostty source..."
     git clone https://github.com/ghostty-org/ghostty "$ghostty_repo"
   fi
 
   echo "Building Ghostty from source..."
-  (
+  if ! (
     cd "$ghostty_repo"
     zig build -Doptimize=ReleaseFast
-  )
+  ); then
+    echo "ERROR: Ghostty build failed." >&2
+    return 1
+  fi
 
   if [[ -x "$ghostty_repo/zig-out/bin/ghostty" ]]; then
     install -m 0755 "$ghostty_repo/zig-out/bin/ghostty" "$ghostty_bin"
@@ -140,7 +158,7 @@ main() {
   echo "Installed tool versions"
   echo "===================="
   if command -v ghostty >/dev/null 2>&1; then
-    ghostty --version 2>/dev/null || ghostty +version 2>/dev/null || echo "ghostty: installed (version check failed)"
+    get_ghostty_version
   else
     echo "ghostty: not installed"
   fi
