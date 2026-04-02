@@ -29,6 +29,11 @@ install_ghostty_wsl() {
     return 0
   fi
 
+  if command -v ghostty >/dev/null 2>&1; then
+    echo "Ghostty is already installed: $(ghostty --version 2>/dev/null || ghostty +version 2>/dev/null || echo 'version unknown')"
+    return 0
+  fi
+
   echo "WSL detected. Installing Ghostty build dependencies..."
   sudo apt-get update -y
   sudo apt-get install -y \
@@ -70,7 +75,7 @@ configure_ghostty_wsl() {
     return 0
   fi
 
-  local path_line='export PATH="$HOME/.local/bin:$PATH"'
+  local path_line="export PATH=\"\$HOME/.local/bin:\$PATH\""
   append_once_to_file "$HOME/.zshrc" "$path_line"
   append_once_to_file "$HOME/.bashrc" "$path_line"
   export PATH="$HOME/.local/bin:$PATH"
@@ -135,7 +140,7 @@ main() {
   echo "Installed tool versions"
   echo "===================="
   if command -v ghostty >/dev/null 2>&1; then
-    ghostty +version || echo "ghostty: installed (version check failed)"
+    ghostty --version 2>/dev/null || ghostty +version 2>/dev/null || echo "ghostty: installed (version check failed)"
   else
     echo "ghostty: not installed"
   fi

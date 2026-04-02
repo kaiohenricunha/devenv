@@ -167,6 +167,24 @@ sudo dpkg -i cosign_${LATEST_VERSION}_amd64.deb
 
 </details>
 
+<details markdown="1"><summary><b>WSL: Ghostty terminal support</b></summary><br>
+
+When this project runs inside WSL, `other_tools.sh` now installs and configures [Ghostty](https://ghostty.org/) by building it from source, including:
+
+- Installing required build dependencies and `zig`
+- Cloning/updating `ghostty-org/ghostty` into `~/.local/src/ghostty`
+- Building and installing the binary into `~/.local/bin/ghostty`
+- Adding `~/.local/bin` to shell PATH (`~/.zshrc` / `~/.bashrc`)
+- Creating `~/.config/ghostty/config` with a sensible default shell (`/usr/bin/zsh` or `/bin/bash`)
+
+After running the setup, open a new shell session and run:
+
+```sh
+ghostty --version
+```
+
+</details>
+
 
 <a id="installation"></a>
 ### Installation
