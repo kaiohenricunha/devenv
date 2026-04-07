@@ -2,24 +2,16 @@
 
 set -euo pipefail
 
+DEVENV_SCRIPT_NAME="programming_languages"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+source "$SCRIPT_DIR/utils.sh"
+
 # Fixed versions to install
 PYTHON_VERSION="3.13.0"
 NODE_VERSION="22"          # major is enough for nvm
 GO_VERSION="go1.25.3"
 GO_BOOTSTRAP_VERSION="go1.22.6"  # used only for initial gvm bootstrap
 RUST_VERSION="1.82.0"
-
-log() {
-    printf "[programming_languages] %s\n" "$*"
-}
-
-append_once_to_zshrc() {
-    local line="$1"
-    if [[ -f "$HOME/.zshrc" ]] && grep -Fqx "$line" "$HOME/.zshrc"; then
-        return 0
-    fi
-    echo "$line" >>"$HOME/.zshrc"
-}
 
 install_pyenv() {
     if command -v pyenv >/dev/null 2>&1; then
@@ -28,7 +20,7 @@ install_pyenv() {
         log "~/.pyenv exists; wiring into PATH."
     else
         log "Installing pyenv..."
-        curl -fsSL https://pyenv.run | bash
+        curl --retry 3 --max-time 60 -fsSL https://pyenv.run | bash
     fi
 
     export PYENV_ROOT="$HOME/.pyenv"
@@ -73,7 +65,7 @@ install_gvm_and_go() {
 
     if [[ ! -d "$HOME/.gvm" ]]; then
         log "Installing gvm..."
-        if ! curl -fsSL https://raw.githubusercontent.com/moovweb/gvm/master/binscripts/gvm-installer | bash; then
+        if ! curl --retry 3 --max-time 60 -fsSL https://raw.githubusercontent.com/moovweb/gvm/master/binscripts/gvm-installer | bash; then
             log "WARNING: gvm installer failed; skipping Go."
             return 0
         fi
@@ -122,7 +114,7 @@ install_nvm_and_node() {
 
     if [[ ! -s "$NVM_DIR/nvm.sh" ]] && ! command -v nvm >/dev/null 2>&1; then
         log "Installing nvm..."
-        curl -fsSL https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.7/install.sh | bash
+        curl --retry 3 --max-time 60 -fsSL https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.7/install.sh | bash
     fi
 
     append_once_to_zshrc 'export NVM_DIR="$HOME/.nvm"'
@@ -153,7 +145,7 @@ install_nvm_and_node() {
 install_rust() {
     if ! command -v rustup >/dev/null 2>&1 && ! command -v rustc >/dev/null 2>&1; then
         log "Installing rustup..."
-        curl --proto '=https' --tlsv1.2 -fsSL https://sh.rustup.rs | sh -s -- -y --profile minimal
+        curl --retry 3 --max-time 60 --proto '=https' --tlsv1.2 -fsSL https://sh.rustup.rs | sh -s -- -y --profile minimal
         append_once_to_zshrc 'export PATH="$HOME/.cargo/bin:$PATH"'
     fi
 

@@ -2,11 +2,15 @@
 
 set -euo pipefail
 
-DESIRED_ZSH_PLUGINS='plugins=(git vscode golang terraform kubectx operator-sdk kube-ps1 zsh-autosuggestions zsh-syntax-highlighting fast-syntax-highlighting zsh-autocomplete)'
+DEVENV_SCRIPT_NAME="main"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+source "$SCRIPT_DIR/utils.sh"
 
-log() {
-    echo "[devenv] $*"
-}
+DEVENV_TMPFILES=()
+cleanup_tmpfiles() { rm -f "${DEVENV_TMPFILES[@]}" 2>/dev/null || true; }
+trap cleanup_tmpfiles EXIT
+
+DESIRED_ZSH_PLUGINS='plugins=(git vscode golang terraform kubectx operator-sdk kube-ps1 zsh-autosuggestions zsh-syntax-highlighting fast-syntax-highlighting zsh-autocomplete)'
 
 ensure_apt_packages() {
     sudo apt-get update
@@ -60,6 +64,7 @@ maybe_make_kitty_safe() {
 
     local tmp
     tmp="$(mktemp)"
+    DEVENV_TMPFILES+=("$tmp")
 
     awk '
         # Replace any explicit zsh shell setting with bash.
@@ -86,6 +91,7 @@ update_zshrc_plugins() {
 
     local tmp
     tmp="$(mktemp)"
+    DEVENV_TMPFILES+=("$tmp")
 
     awk -v desired_plugins="$DESIRED_ZSH_PLUGINS" '
         BEGIN {
@@ -182,7 +188,12 @@ if [[ $(uname -s) != "Linux" ]]; then
     exit 1
 fi
 
-echo "Detected Linux (Pop!_OS / Ubuntu-based). Installing necessary system packages..."
+log "Running pre-flight checks..."
+check_internet
+require_commands curl git sudo
+log "Pre-flight checks passed."
+
+log "Detected Linux (Pop!_OS / Ubuntu-based). Installing necessary system packages..."
 
 ensure_apt_packages \
     curl git vim make binutils bison gcc build-essential wget jq htop iftop \
@@ -203,7 +214,7 @@ if [[ ! -d "$HOME/.oh-my-zsh" ]]; then
     log "Installing Oh My Zsh..."
     # Non-interactive install; do not auto-run zsh or auto-change shell.
     RUNZSH=no CHSH=no KEEP_ZSHRC=yes \
-        sh -c "$(curl -fsSL https://raw.githubusercontent.com/ohmyzsh/ohmyzsh/master/tools/install.sh)" || true
+        sh -c "$(curl --retry 3 --max-time 60 -fsSL https://raw.githubusercontent.com/ohmyzsh/ohmyzsh/master/tools/install.sh)" || true
 else
     log "Oh My Zsh is already installed."
 fi
@@ -213,19 +224,19 @@ log "Installing Oh My Zsh plugins..."
 ZSH_CUSTOM="${ZSH_CUSTOM:-$HOME/.oh-my-zsh/custom}"
 
 if [[ ! -d "$ZSH_CUSTOM/plugins/zsh-autosuggestions" ]]; then
-    git clone https://github.com/zsh-users/zsh-autosuggestions.git $ZSH_CUSTOM/plugins/zsh-autosuggestions
+    git clone https://github.com/zsh-users/zsh-autosuggestions.git "$ZSH_CUSTOM/plugins/zsh-autosuggestions"
 fi
 
 if [[ ! -d "$ZSH_CUSTOM/plugins/zsh-syntax-highlighting" ]]; then
-    git clone https://github.com/zsh-users/zsh-syntax-highlighting.git $ZSH_CUSTOM/plugins/zsh-syntax-highlighting
+    git clone https://github.com/zsh-users/zsh-syntax-highlighting.git "$ZSH_CUSTOM/plugins/zsh-syntax-highlighting"
 fi
 
 if [[ ! -d "$ZSH_CUSTOM/plugins/fast-syntax-highlighting" ]]; then
-    git clone https://github.com/zdharma-continuum/fast-syntax-highlighting.git $ZSH_CUSTOM/plugins/fast-syntax-highlighting
+    git clone https://github.com/zdharma-continuum/fast-syntax-highlighting.git "$ZSH_CUSTOM/plugins/fast-syntax-highlighting"
 fi
 
 if [[ ! -d "$ZSH_CUSTOM/plugins/zsh-autocomplete" ]]; then
-    git clone --depth 1 -- https://github.com/marlonrichert/zsh-autocomplete.git $ZSH_CUSTOM/plugins/zsh-autocomplete
+    git clone --depth 1 -- https://github.com/marlonrichert/zsh-autocomplete.git "$ZSH_CUSTOM/plugins/zsh-autocomplete"
 fi
 
 ## Enable plugins by updating the plugins=(...) block safely + idempotently
@@ -234,45 +245,36 @@ update_zshrc_plugins
 ## If Zsh is still missing for any reason, avoid Kitty breaking hard.
 maybe_make_kitty_safe
 
-# Install programming languages
-./programming_languages.sh
+# ---------------------------------------------------------------------------
+# Run each module via run_stage (tracks success/failure for summary)
+# ---------------------------------------------------------------------------
 
-# Install IaC tools
-./iac.sh
+run_stage "Programming Languages" "$SCRIPT_DIR/programming_languages.sh"
+run_stage "IaC Tools"             "$SCRIPT_DIR/iac.sh"
+run_stage "Cloud Tools"           "$SCRIPT_DIR/cloud_tools.sh"
+run_stage "Kubernetes Tools"      "$SCRIPT_DIR/k8s_tools.sh"
 
-# Install cloud tools
-./cloud_tools.sh
-
-# Install k8s tools
-./k8s_tools.sh
-
-# Install AI tools
+# AI tools — Claude Code uses native installer; Copilot/Codex need npm (handled internally)
 if ! command -v npm >/dev/null 2>&1; then
     if [[ -s "$HOME/.nvm/nvm.sh" ]]; then
-        # Load nvm into the current shell so npm/node installed via nvm are usable here.
         # shellcheck disable=SC1091
         . "$HOME/.nvm/nvm.sh"
         nvm use default >/dev/null 2>&1 || true
     fi
 fi
+run_stage "AI Tools" "$SCRIPT_DIR/ai_tools.sh"
 
-if command -v npm >/dev/null 2>&1; then
-    ./ai_tools.sh
-else
-    echo "[main] npm not found on PATH; skipping AI tools setup."
+run_stage "Other Tools" "$SCRIPT_DIR/other_tools.sh"
+
+if [[ -x "$SCRIPT_DIR/virtualization.sh" ]]; then
+    run_stage "Virtualization" "$SCRIPT_DIR/virtualization.sh"
 fi
 
-# Install other tools
-./other_tools.sh
+run_stage "Final Config" "$SCRIPT_DIR/final_config.sh"
 
-# Install virtualization stack (KVM/QEMU + libvirt + virt-manager)
-if [[ -x "./virtualization.sh" ]]; then
-    ./virtualization.sh
-else
-    echo "[main] virtualization.sh not found or not executable; skipping virtualization setup."
-fi
-
-# Configure contexts and additional adjustments
-./final_config.sh
+# ---------------------------------------------------------------------------
+# Summary
+# ---------------------------------------------------------------------------
 
 final_sanity_summary
+print_summary

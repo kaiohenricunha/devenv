@@ -1,4 +1,10 @@
-#!/bin/zsh
+#!/usr/bin/env bash
+
+set -euo pipefail
+
+DEVENV_SCRIPT_NAME="final_config"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+source "$SCRIPT_DIR/utils.sh"
 
 # # Configure AWS CLI
 # echo "Configuring AWS CLI..."

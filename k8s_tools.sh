@@ -2,38 +2,23 @@
 
 set -euo pipefail
 
+DEVENV_SCRIPT_NAME="k8s_tools"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+source "$SCRIPT_DIR/utils.sh"
+
 OS=$(uname -s)
 ARCH=$(uname -m)
-
-log() {
-    printf "[k8s_tools] %s\n" "$*"
-}
-
-get_latest_github_release() {
-  curl -s "https://api.github.com/repos/$1/releases/latest" | grep '"tag_name":' | sed -E 's/.*"([^"]+)".*/\1/'
-}
+DEVENV_ARCH="$(detect_arch)"
 
 install_kubectl() {
   if ! command -v kubectl >/dev/null 2>&1; then
     log "Installing kubectl..."
-    curl -LO "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl"
+    curl --retry 3 --max-time 60 -LO "https://dl.k8s.io/release/$(curl --retry 3 --max-time 15 -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/${DEVENV_ARCH}/kubectl"
     chmod +x kubectl
     sudo mv kubectl /usr/local/bin/kubectl
   else
     log "kubectl already installed."
   fi
-}
-
-ensure_line_in_file() {
-  local file="$1"
-  local line="$2"
-
-  [[ -f "$file" ]] || return 0
-  if grep -Fqx "$line" "$file"; then
-    return 0
-  fi
-
-  printf "\n%s\n" "$line" >>"$file"
 }
 
 install_krew() {
@@ -47,26 +32,16 @@ install_krew() {
   else
     log "Installing krew (kubectl plugin manager)..."
 
-    local os arch krew tmpdir
+    local os krew tmpdir
     os="$(uname -s | tr '[:upper:]' '[:lower:]')"
-    arch="$(uname -m)"
-    case "$arch" in
-      x86_64) arch="amd64" ;;
-      aarch64) arch="arm64" ;;
-      arm64) arch="arm64" ;;
-      *)
-        echo "[k8s_tools] ERROR: Unsupported architecture for krew: $(uname -m)" >&2
-        return 1
-        ;;
-    esac
 
-    krew="krew-${os}_${arch}"
+    krew="krew-${os}_${DEVENV_ARCH}"
     tmpdir="$(mktemp -d)"
     trap 'rm -rf "$tmpdir"' RETURN
 
     (
       cd "$tmpdir"
-      curl -fsSLO "https://github.com/kubernetes-sigs/krew/releases/latest/download/${krew}.tar.gz"
+      curl --retry 3 --max-time 60 -fsSLO "https://github.com/kubernetes-sigs/krew/releases/latest/download/${krew}.tar.gz"
       tar -xzf "${krew}.tar.gz"
       ./${krew} install krew
     )
@@ -76,8 +51,8 @@ install_krew() {
   export PATH="${KREW_ROOT:-$HOME/.krew}/bin:$PATH"
 
   # Persist PATH change for interactive shells without overwriting user config.
-  ensure_line_in_file "$HOME/.zshrc" "$path_line"
-  ensure_line_in_file "$HOME/.bashrc" "$path_line"
+  append_once_to_file "$HOME/.zshrc" "$path_line"
+  append_once_to_file "$HOME/.bashrc" "$path_line"
 
   log "NOTE: open a new shell (or re-login) for krew PATH to apply everywhere."
 }
@@ -87,8 +62,10 @@ install_kubectx_kubens() {
     log "Installing kubectx + kubens..."
     KUBECTX_VERSION=$(get_latest_github_release "ahmetb/kubectx")
     
-    curl -Lo kubectx.tar.gz "https://github.com/ahmetb/kubectx/releases/download/${KUBECTX_VERSION}/kubectx_${KUBECTX_VERSION}_linux_x86_64.tar.gz"
-    curl -Lo kubens.tar.gz "https://github.com/ahmetb/kubectx/releases/download/${KUBECTX_VERSION}/kubens_${KUBECTX_VERSION}_linux_x86_64.tar.gz"
+    local kubectx_arch
+    if [[ "$DEVENV_ARCH" == "amd64" ]]; then kubectx_arch="linux_x86_64"; else kubectx_arch="linux_arm64"; fi
+    curl --retry 3 --max-time 60 -Lo kubectx.tar.gz "https://github.com/ahmetb/kubectx/releases/download/${KUBECTX_VERSION}/kubectx_${KUBECTX_VERSION}_${kubectx_arch}.tar.gz"
+    curl --retry 3 --max-time 60 -Lo kubens.tar.gz "https://github.com/ahmetb/kubectx/releases/download/${KUBECTX_VERSION}/kubens_${KUBECTX_VERSION}_${kubectx_arch}.tar.gz"
     
     tar -xzf kubectx.tar.gz kubectx
     tar -xzf kubens.tar.gz kubens
@@ -106,7 +83,7 @@ install_kubectx_kubens() {
 install_helm() {
   if ! command -v helm >/dev/null 2>&1; then
     log "Installing Helm..."
-    curl -fsSL -o get_helm.sh https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3
+    curl --retry 3 --max-time 60 -fsSL -o get_helm.sh https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3
     chmod +x get_helm.sh
     ./get_helm.sh
     rm get_helm.sh
@@ -122,7 +99,7 @@ install_docker() {
     sudo apt-get update
     sudo apt-get install -y ca-certificates curl
     sudo install -m 0755 -d /etc/apt/keyrings
-    sudo curl -fsSL https://download.docker.com/linux/ubuntu/gpg -o /etc/apt/keyrings/docker.asc
+    sudo curl --retry 3 --max-time 60 -fsSL https://download.docker.com/linux/ubuntu/gpg -o /etc/apt/keyrings/docker.asc
     sudo chmod a+r /etc/apt/keyrings/docker.asc
 
     # Add the repository to Apt sources:
@@ -145,9 +122,10 @@ install_docker() {
 install_minikube() {
   if ! command -v minikube >/dev/null 2>&1; then
     log "Installing minikube..."
-    curl -Lo minikube-linux-amd64 https://github.com/kubernetes/minikube/releases/latest/download/minikube-linux-amd64
-    chmod +x minikube-linux-amd64
-    sudo mv minikube-linux-amd64 /usr/local/bin/minikube
+    local minikube_bin="minikube-linux-${DEVENV_ARCH}"
+    curl --retry 3 --max-time 60 -Lo "$minikube_bin" "https://github.com/kubernetes/minikube/releases/latest/download/${minikube_bin}"
+    chmod +x "$minikube_bin"
+    sudo mv "$minikube_bin" /usr/local/bin/minikube
   else
     log "minikube already installed."
   fi
@@ -159,7 +137,7 @@ install_kind() {
     # Get latest version dynamically
     KIND_VERSION=$(get_latest_github_release "kubernetes-sigs/kind")
     log "Latest kind version: $KIND_VERSION"
-    curl -Lo ./kind "https://kind.sigs.k8s.io/dl/${KIND_VERSION}/kind-linux-amd64"
+    curl --retry 3 --max-time 60 -Lo ./kind "https://kind.sigs.k8s.io/dl/${KIND_VERSION}/kind-linux-${DEVENV_ARCH}"
     chmod +x kind
     sudo mv kind /usr/local/bin/kind
   else

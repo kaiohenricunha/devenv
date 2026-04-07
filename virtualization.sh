@@ -2,14 +2,26 @@
 
 set -euo pipefail
 
+DEVENV_SCRIPT_NAME="virtualization"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+source "$SCRIPT_DIR/utils.sh"
+
 if [[ "$(uname -s)" != "Linux" ]]; then
-  echo "[virtualization] Linux only. Skipping."
+  log "Linux only. Skipping."
   exit 0
 fi
 
-log() {
-  printf "[virtualization] %s\n" "$*"
-}
+if is_wsl; then
+  log "WSL detected."
+  if grep -qi "WSL2" /proc/version 2>/dev/null; then
+    log "WSL2 detected. KVM may work with nested virtualization enabled in .wslconfig."
+    log "Ensure '[wsl2] nestedVirtualization=true' in %USERPROFILE%\\.wslconfig."
+    log "Proceeding, but KVM functionality is not guaranteed."
+  else
+    log "WSL1 detected. KVM is not supported. Skipping virtualization."
+    exit 0
+  fi
+fi
 
 USER_NAME="${SUDO_USER:-$USER}"
 

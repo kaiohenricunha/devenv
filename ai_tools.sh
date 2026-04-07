@@ -2,6 +2,10 @@
 
 set -euo pipefail
 
+DEVENV_SCRIPT_NAME="ai_tools"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+source "$SCRIPT_DIR/utils.sh"
+
 if [[ "$(uname -s)" != "Linux" ]]; then
   echo "This script supports only Linux. Detected: $(uname -s). Aborting."
   exit 1
@@ -26,8 +30,7 @@ ensure_npm() {
     return 0
   fi
 
-  echo "npm is required to install AI tools. Ensure Node.js/npm is installed first."
-  exit 1
+  return 1
 }
 
 ensure_npm_global_bin_on_path() {
@@ -41,6 +44,8 @@ ensure_npm_global_bin_on_path() {
   npm_global_bin="$npm_global_prefix/bin"
   if [[ -n "$npm_global_bin" && -d "$npm_global_bin" && ":$PATH:" != *":$npm_global_bin:"* ]]; then
     export PATH="$npm_global_bin:$PATH"
+    append_once_to_file "$HOME/.zshrc" "export PATH=\"$npm_global_bin:\$PATH\""
+    append_once_to_file "$HOME/.bashrc" "export PATH=\"$npm_global_bin:\$PATH\""
   fi
 }
 
@@ -65,14 +70,15 @@ install_claude_code() {
     return 0
   fi
 
-  echo "Installing Claude Code..."
-  npm install -g @anthropic-ai/claude-code
-  ensure_npm_global_bin_on_path
+  echo "Installing Claude Code (native installer)..."
+  curl --retry 3 --max-time 60 -fsSL https://claude.ai/install.sh | sh
+  # Refresh PATH in case the installer placed the binary in ~/.claude/local/bin or similar
+  export PATH="$HOME/.claude/local/bin:$HOME/.local/bin:$PATH"
   if command -v claude >/dev/null 2>&1; then
     echo "Claude Code installed:"
     print_tool_version claude
   else
-    print_path_guidance claude
+    echo "Claude Code installed but 'claude' not on PATH. Try opening a new shell."
   fi
 }
 
@@ -113,11 +119,17 @@ install_codex() {
 }
 
 main() {
-  ensure_npm
-  ensure_npm_global_bin_on_path
+  # Claude Code uses its native installer (no npm needed)
   install_claude_code
-  install_copilot_cli
-  install_codex
+
+  # Copilot CLI and Codex require npm
+  if ensure_npm; then
+    ensure_npm_global_bin_on_path
+    install_copilot_cli
+    install_codex
+  else
+    echo "npm not found; skipping Copilot CLI and Codex (Claude Code installed independently)."
+  fi
 
   echo "===================="
   echo "Installed AI tools"

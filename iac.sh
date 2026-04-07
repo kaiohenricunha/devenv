@@ -1,7 +1,11 @@
-#!/usr/bin/env zsh
+#!/usr/bin/env bash
 # iac_tools_setup.sh — installs Pulumi, tenv + Terraform / Terragrunt / OpenTofu
 
 set -euo pipefail
+
+DEVENV_SCRIPT_NAME="iac"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+source "$SCRIPT_DIR/utils.sh"
 
 export PULUMI_VERSION="3.84.0"
 export TENV_VERSION="4.8.3"
@@ -14,12 +18,10 @@ OS=$(uname -s)
 install_pulumi() {
   if ! command -v pulumi >/dev/null 2>&1 || ! pulumi version | grep -q "v$PULUMI_VERSION"; then
     echo "Installing Pulumi v$PULUMI_VERSION..."
-    curl -fsSL https://get.pulumi.com | sh -s -- --version $PULUMI_VERSION
+    curl --retry 3 --max-time 60 -fsSL https://get.pulumi.com | sh -s -- --version "$PULUMI_VERSION"
     export PATH="$PATH:$HOME/.pulumi/bin"
-    # if using zsh, update session
-    if [[ -n "$ZSH_VERSION" ]]; then
-      source ~/.zshrc || true
-    fi
+    append_once_to_file "$HOME/.zshrc" 'export PATH="$HOME/.pulumi/bin:$PATH"'
+    append_once_to_file "$HOME/.bashrc" 'export PATH="$HOME/.pulumi/bin:$PATH"'
   else
     echo "Pulumi v$PULUMI_VERSION is already installed."
   fi
@@ -35,8 +37,14 @@ install_tenv() {
       tmpdir="$(mktemp -d)"
       trap 'rm -rf "$tmpdir"' RETURN
 
-      curl -fsSL -o "$tmpdir/tenv.tar.gz" \
-        "https://github.com/tofuutils/tenv/releases/download/v$TENV_VERSION/tenv_v${TENV_VERSION}_Linux_x86_64.tar.gz"
+      local tenv_arch
+      case "$(uname -m)" in
+        x86_64)  tenv_arch="x86_64" ;;
+        aarch64) tenv_arch="arm64" ;;
+        *)       log "Unsupported architecture for tenv: $(uname -m)"; return 1 ;;
+      esac
+      curl --retry 3 --max-time 120 -fsSL -o "$tmpdir/tenv.tar.gz" \
+        "https://github.com/tofuutils/tenv/releases/download/v$TENV_VERSION/tenv_v${TENV_VERSION}_Linux_${tenv_arch}.tar.gz"
       tar -xzf "$tmpdir/tenv.tar.gz" -C "$tmpdir"
 
       # tenv release tarballs can contain the main `tenv` binary plus tool proxy binaries

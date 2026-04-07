@@ -1,27 +1,15 @@
-#!/usr/bin/env zsh
+#!/usr/bin/env bash
 set -euo pipefail
+
+DEVENV_SCRIPT_NAME="other_tools"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+source "$SCRIPT_DIR/utils.sh"
 
 # Exit if not Linux
 if [[ "$(uname -s)" != "Linux" ]]; then
   echo "This script supports only Linux. Detected: $(uname -s). Aborting."
   exit 1
 fi
-
-append_once_to_file() {
-  local file="$1"
-  local line="$2"
-
-  [[ -f "$file" ]] || return 0
-  if grep -Fqx "$line" "$file"; then
-    return 0
-  fi
-
-  printf '\n%s\n' "$line" >>"$file"
-}
-
-is_wsl() {
-  [[ -n "${WSL_DISTRO_NAME:-}" ]] || [[ -n "${WSL_INTEROP:-}" ]] || grep -qiE "(microsoft|wsl)" /proc/version
-}
 
 get_ghostty_version() {
   # Prefer --version, but keep +version fallback for older builds that only expose it.
@@ -141,7 +129,7 @@ install_k6() {
   echo "Installing k6..."
 
   sudo mkdir -p /usr/share/keyrings
-  curl -fsSL https://dl.k6.io/key.gpg \
+  curl --retry 3 --max-time 60 -fsSL https://dl.k6.io/key.gpg \
     | sudo gpg --dearmor -o /usr/share/keyrings/k6-archive-keyring.gpg
 
   echo "deb [signed-by=/usr/share/keyrings/k6-archive-keyring.gpg] \
